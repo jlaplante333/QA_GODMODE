@@ -7,7 +7,7 @@ Made for Dec 17th 2025, AI Hacks hackathon in Tokyo, QA Agent Godmode is a hacka
 
 ## 🎯 What It Does
 
-1. **Ingests** raw stack traces (simulating Sentry error data)
+1. **Ingests** raw stack traces (ACTUAL Sentry error data)
 2. **Curates** only relevant evidence into a minimal "Context Pack" (deterministic, no AI)
 3. **Diagnoses** the bug using LLM reasoning over the curated context
 4. **Generates** minimal repro steps and a proposed fix
