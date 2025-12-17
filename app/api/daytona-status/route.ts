@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   const hasKey = !!process.env.DAYTONA_API_KEY;
-  const serverUrl = process.env.DAYTONA_SERVER_URL || null;
+  const serverUrl = process.env.DAYTONA_API_URL || process.env.DAYTONA_SERVER_URL || null;
 
   // Debug logging (server-side only)
   // eslint-disable-next-line no-console

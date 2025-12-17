@@ -43,8 +43,8 @@ export default function HomePage() {
     stdout: string;
     stderr?: string;
     command?: string;
-    workspaceId?: string;
-    workspaceName?: string;
+    sandboxId?: string;
+    sandboxName?: string;
   } | null>(null);
 
   useEffect(() => {
@@ -106,23 +106,27 @@ export default function HomePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           reproSteps: result.reproAndFix.reproSteps,
-          workspaceName: `qa-repro-${Date.now()}`
+          sandboxName: `qa-repro-${Date.now()}`
         })
       });
 
       if (!res.ok) {
         const payload = await res.json().catch(() => ({}));
-        throw new Error(payload.error ?? `Daytona execution failed (${res.status})`);
+        const errorMsg = payload.details 
+          ? `${payload.error}: ${payload.details}${payload.suggestion ? `\n\nSuggestion: ${payload.suggestion}` : ''}`
+          : payload.error ?? `Daytona execution failed (${res.status})`;
+        throw new Error(errorMsg);
       }
 
       const data = await res.json();
       setDaytonaResult(data);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(errorMessage);
       setDaytonaResult({
         success: false,
         stdout: '',
-        stderr: err instanceof Error ? err.message : String(err)
+        stderr: errorMessage
       });
     } finally {
       setDaytonaExecuting(false);
@@ -298,9 +302,9 @@ export default function HomePage() {
                     <div style={{ color: daytonaResult.success ? '#10b981' : '#ef4444', marginBottom: 4 }}>
                       {daytonaResult.success ? '✅ Execution succeeded' : '❌ Execution failed'}
                     </div>
-                    {daytonaResult.workspaceId && (
+                    {daytonaResult.sandboxId && (
                       <div style={{ color: '#9ca3af', marginBottom: 4 }}>
-                        Workspace: {daytonaResult.workspaceName || daytonaResult.workspaceId}
+                        Sandbox: {daytonaResult.sandboxName || daytonaResult.sandboxId}
                       </div>
                     )}
                     {daytonaResult.command && (

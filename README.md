@@ -84,7 +84,7 @@ ai_qa_godmode/
 ### 4. Daytona Integration (`lib/daytonaClient.ts`)
 **Real sandboxed execution**
 
-- Creates Daytona workspaces on-demand
+- Creates Daytona sandboxes on-demand
 - Executes repro steps in real sandboxed environments
 - Returns execution results for verification
 
@@ -167,7 +167,7 @@ If you have Daytona configured:
 
 1. After running "Analyze Bug", you'll see a **"🚀 Create Daytona Sandbox & Reproduce"** button
 2. Click it to:
-   - Create a new Daytona workspace
+   - Create a new Daytona sandbox
    - Execute the repro steps in a real sandboxed environment
    - Get actual execution results
 
@@ -293,8 +293,8 @@ Create Daytona sandbox and execute repro steps.
   "stderr": "",
   "exitCode": 0,
   "command": "npm test",
-  "workspaceId": "workspace-id",
-  "workspaceName": "qa-repro-1234567890"
+  "sandboxId": "sandbox-id",
+  "sandboxName": "qa-repro-1234567890"
 }
 ```
 
@@ -320,7 +320,7 @@ TypeError: Cannot read properties of undefined (reading 'user')
 
 - [ ] Direct Sentry API integration
 - [ ] Support for multiple LLM providers
-- [ ] Real Daytona workspace management
+- [ ] Real Daytona sandbox management
 - [ ] Fix auto-application (with approval)
 - [ ] Historical error tracking
 - [ ] Team collaboration features
