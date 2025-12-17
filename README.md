@@ -1,8 +1,9 @@
 # QA Agent Godmode 🚀
 
 > **An orchestrated AI-powered QA Agent that curates evidence, diagnoses bugs, generates fixes, and reproduces errors in sandboxed environments.**
+<img width="2186" height="2046" alt="image" src="https://github.com/user-attachments/assets/134ec196-f615-4762-8738-60bff107d4b4" />
 
-QA Agent Godmode is a hackathon-grade MVP that demonstrates a complete bug analysis workflow: from raw stack traces (simulating Sentry data) to AI-powered diagnosis, fix generation, sandboxed execution, and verification. It's **NOT a chatbot**—it's a deterministic, state-machine orchestrated agent system with clear separation of concerns.
+Made for Dec 17th 2025, AI Hacks hackathon in Tokyo, QA Agent Godmode is a hackathon-grade MVP that demonstrates a complete bug analysis workflow: from raw stack traces (simulating Sentry data) to AI-powered diagnosis, fix generation, sandboxed execution, and verification. It's **NOT a chatbot**—it's a deterministic, state-machine orchestrated agent system with clear separation of concerns.
 
 ## 🎯 What It Does
 
