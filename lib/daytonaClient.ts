@@ -51,40 +51,63 @@ export async function executeInDaytona(
   workspaceId: string,
   command: string
 ): Promise<DaytonaExecuteResult> {
-  const url = `${DAYTONA_SERVER_URL}/workspaces/${workspaceId}/exec`;
+  // Try different API endpoint paths
+  const possiblePaths = [
+    `/v1/workspaces/${workspaceId}/exec`,
+    `/workspaces/${workspaceId}/exec`,
+    `/api/v1/workspaces/${workspaceId}/exec`
+  ];
 
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${DAYTONA_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        command: command
-      })
-    });
+  for (const path of possiblePaths) {
+    const url = `${DAYTONA_SERVER_URL}${path}`;
 
-    if (!response.ok) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${DAYTONA_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          command: command
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        return {
+          success: data.exitCode === 0,
+          stdout: data.stdout || '',
+          stderr: data.stderr || '',
+          exitCode: data.exitCode
+        };
+      }
+
+      // If 404, try next path
+      if (response.status === 404) {
+        continue;
+      }
+
       const errorText = await response.text();
       throw new Error(`Daytona API error (${response.status}): ${errorText}`);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('404')) {
+        continue;
+      }
+      return {
+        success: false,
+        stdout: '',
+        stderr: error instanceof Error ? error.message : String(error)
+      };
     }
-
-    const data = await response.json();
-    
-    return {
-      success: data.exitCode === 0,
-      stdout: data.stdout || '',
-      stderr: data.stderr || '',
-      exitCode: data.exitCode
-    };
-  } catch (error) {
-    return {
-      success: false,
-      stdout: '',
-      stderr: error instanceof Error ? error.message : String(error)
-    };
   }
+
+  return {
+    success: false,
+    stdout: '',
+    stderr: 'Failed to execute command: all API endpoint paths returned 404'
+  };
 }
 
 /**
@@ -96,55 +119,114 @@ export async function executeInDaytona(
 export async function createDaytonaWorkspace(
   options: CreateWorkspaceRequest = {}
 ): Promise<DaytonaWorkspace> {
-  const url = `${DAYTONA_SERVER_URL}/workspaces`;
+  // Since DAYTONA_SERVER_URL is already https://app.daytona.io/api, we just append the endpoint
+  // Try different endpoint variations
+  const possiblePaths = [
+    '/workspace',  // Singular
+    '/workspaces', // Plural
+    '/v1/workspace',
+    '/v1/workspaces'
+  ];
 
   const workspaceName = options.name || `qa-repro-${Date.now()}`;
   const projectName = options.projectName || 'qa-repro';
   
   // Default to a minimal Node.js template if no repo is provided
   const repositoryUrl = options.repositoryUrl || 'https://github.com/daytonaio/templates/tree/main/nodejs';
-  const template = options.template || 'nodejs';
 
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${DAYTONA_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        name: workspaceName,
-        project: {
-          name: projectName,
-          repository: {
-            url: repositoryUrl
-          },
-          source: {
+  let lastError: Error | null = null;
+
+  // Try each possible endpoint path
+  for (const path of possiblePaths) {
+    const url = `${DAYTONA_SERVER_URL}${path}`;
+
+    try {
+      // Try different request body formats
+      const requestBodies = [
+        // Format 1: Simple structure
+        {
+          name: workspaceName,
+          project: {
+            name: projectName,
             repository: {
               url: repositoryUrl
             }
           }
         },
-        template: template
-      })
-    });
+        // Format 2: With source
+        {
+          name: workspaceName,
+          project: {
+            name: projectName,
+            source: {
+              repository: {
+                url: repositoryUrl
+              }
+            }
+          }
+        },
+        // Format 3: Minimal
+        {
+          name: workspaceName,
+          repository: repositoryUrl
+        }
+      ];
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Daytona API error (${response.status}): ${errorText}`);
+      let found404 = false;
+      for (const requestBody of requestBodies) {
+        // eslint-disable-next-line no-console
+        console.log(`Attempting to create workspace at: ${url} with body:`, JSON.stringify(requestBody, null, 2));
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${DAYTONA_API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestBody)
+        });
+
+        if (response.ok) {
+          const workspace = await response.json();
+          
+          // Wait for workspace to be ready (polling)
+          if (workspace.id) {
+            await waitForWorkspaceReady(workspace.id);
+          }
+
+          return workspace;
+        }
+
+        // Track if we got a 404
+        if (response.status === 404) {
+          found404 = true;
+          const errorText = await response.text();
+          // eslint-disable-next-line no-console
+          console.log(`404 at ${url}: ${errorText}`);
+        } else {
+          // If not 404, log the error but continue trying other formats
+          const errorText = await response.text();
+          // eslint-disable-next-line no-console
+          console.log(`Error (${response.status}) at ${url}: ${errorText}`);
+        }
+      }
+
+      // If 404 for all formats, try next path
+      if (found404) {
+        lastError = new Error(`Endpoint not found (${path})`);
+        continue;
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        lastError = error;
+        // eslint-disable-next-line no-console
+        console.log(`Exception trying ${path}:`, error.message);
+      }
     }
-
-    const workspace = await response.json();
-    
-    // Wait for workspace to be ready (polling)
-    if (workspace.id) {
-      await waitForWorkspaceReady(workspace.id);
-    }
-
-    return workspace;
-  } catch (error) {
-    throw new Error(`Failed to create Daytona workspace: ${error instanceof Error ? error.message : String(error)}`);
   }
+
+  // If all paths failed, throw the last error
+  throw new Error(`Failed to create Daytona workspace. Tried all endpoints and formats. Last error: ${lastError?.message || 'Unknown error'}`);
 }
 
 /**
@@ -199,27 +281,46 @@ export async function getDaytonaWorkspace(workspaceId: string): Promise<DaytonaW
  * List available Daytona workspaces.
  */
 export async function listDaytonaWorkspaces(): Promise<DaytonaWorkspace[]> {
-  const url = `${DAYTONA_SERVER_URL}/workspaces`;
+  // Try different API endpoint paths
+  const possiblePaths = [
+    '/v1/workspaces',
+    '/workspaces',
+    '/api/v1/workspaces'
+  ];
 
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${DAYTONA_API_KEY}`
+  for (const path of possiblePaths) {
+    const url = `${DAYTONA_SERVER_URL}${path}`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${DAYTONA_API_KEY}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return Array.isArray(data) ? data : data.workspaces || [];
       }
-    });
 
-    if (!response.ok) {
+      // If 404, try next path
+      if (response.status === 404) {
+        continue;
+      }
+
       throw new Error(`Daytona API error (${response.status})`);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('404')) {
+        continue;
+      }
+      // eslint-disable-next-line no-console
+      console.error(`Failed to list Daytona workspaces at ${path}:`, error);
     }
-
-    const data = await response.json();
-    return Array.isArray(data) ? data : data.workspaces || [];
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('Failed to list Daytona workspaces:', error);
-    return [];
   }
+
+  // If all paths failed, return empty array
+  return [];
 }
 
 /**
